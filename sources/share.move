@@ -1,17 +1,14 @@
 // Copyright (c) Subsonic Labs, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-/// A standalone module for creating fixed-supply share tokens on Sui.
-/// Share tokens represent ownership stakes in any entity and can be used
-/// for pro-rata reward distribution.
+/// Fixed-supply currency issuance for representing equity-like ownership stakes.
 ///
 /// ### Usage:
 ///
 /// 1. Create a package with a `share` module containing a `Share` type
-/// 2. Create a currency with `sui::coin_registry::new_currency`, using
-///    `share::share::icon_url(blob_id)` as the icon URL
+/// 2. Create a currency with `sui::coin_registry::new_currency`
 /// 3. Delete the metadata cap via `finalize_and_delete_metadata_cap`
-/// 4. Call `share::share::initialize` with the currency, treasury cap, and icon blob ID
+/// 4. Call `share::share::initialize` with the currency and treasury cap
 /// 5. Distribute the returned balance to shareholders
 module share::share;
 
@@ -29,8 +26,6 @@ use sui::coin_registry::Currency;
 const SUPPLY: u64 = 10_000_000_000_000;
 /// Required number of decimal places.
 const DECIMALS: u8 = 6;
-/// Required currency symbol.
-const SYMBOL: vector<u8> = b"SHARE";
 
 /// Suffix that all valid share type names must end with.
 const SHARE_TYPE: vector<u8> = b"::share::Share";
@@ -45,12 +40,16 @@ const EMetadataCapNotDeleted: u64 = 1;
 const EInvalidShareType: u64 = 2;
 /// Currency does not have 6 decimals.
 const EInvalidDecimals: u64 = 3;
-/// Currency symbol is not "SHARE".
-const EInvalidSymbol: u64 = 4;
-/// Currency's icon URL does not match the expected walrus:// URL.
-const EInvalidIconUrl: u64 = 5;
 
 // === Public Functions ===
+
+/// Constructs a `walrus://<base64url>` icon URL from a Walrus blob ID.
+/// Convenience helper for callers using Walrus-hosted icons.
+public fun construct_icon_url(blob_id: u256): String {
+    let mut url: String = b"walrus://".to_string();
+    url.append(base64url::encode(bcs::to_bytes(&blob_id)));
+    url
+}
 
 /// Initializes a fixed-supply share token with 10,000,000.000000 supply.
 /// Validates the currency configuration, mints the fixed supply,
@@ -61,7 +60,6 @@ const EInvalidIconUrl: u64 = 5;
 public fun initialize<Share>(
     currency: &mut Currency<Share>,
     mut treasury_cap: TreasuryCap<Share>,
-    icon_blob_id: u256,
 ): Balance<Share> {
     // Assert the share type is valid.
     assert_valid_share_type<Share>();
@@ -70,10 +68,6 @@ public fun initialize<Share>(
     assert!(currency.is_metadata_cap_deleted(), EMetadataCapNotDeleted);
     // Assert the currency has the correct number of decimals.
     assert!(currency.decimals() == DECIMALS, EInvalidDecimals);
-    // Assert the currency has the correct symbol.
-    assert!(currency.symbol() == SYMBOL.to_string(), EInvalidSymbol);
-    // Assert the currency's icon URL matches the provided blob ID.
-    assert!(currency.icon_url() == construct_icon_url(icon_blob_id), EInvalidIconUrl);
     // Assert the currency has no existing supply.
     assert!(treasury_cap.supply().value() == 0, ENotZeroSupply);
 
@@ -84,15 +78,6 @@ public fun initialize<Share>(
     currency.make_supply_fixed(treasury_cap);
 
     balance
-}
-
-// === Private Functions ===
-
-/// Constructs a `walrus://<base64url>` icon URL from a Walrus blob ID.
-fun construct_icon_url(blob_id: u256): String {
-    let mut url: String = b"walrus://".to_string();
-    url.append(base64url::encode(bcs::to_bytes(&blob_id)));
-    url
 }
 
 //=== Assert Functions ===
