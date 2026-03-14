@@ -12,8 +12,6 @@
 /// 5. Distribute the returned balance to shareholders
 module share::share;
 
-use codec::base64url;
-use std::string::String;
 use std::type_name::with_defining_ids;
 use sui::balance::Balance;
 use sui::bcs;
@@ -42,14 +40,6 @@ const EInvalidShareType: u64 = 2;
 const EInvalidDecimals: u64 = 3;
 
 // === Public Functions ===
-
-/// Constructs a `walrus://<base64url>` icon URL from a Walrus blob ID.
-/// Convenience helper for callers using Walrus-hosted icons.
-public fun construct_icon_url(blob_id: u256): String {
-    let mut url: String = b"walrus://".to_string();
-    url.append(base64url::encode(bcs::to_bytes(&blob_id)));
-    url
-}
 
 /// Initializes a fixed-supply share token with 10,000,000.000000 supply.
 /// Validates the currency configuration, mints the fixed supply,

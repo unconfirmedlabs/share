@@ -2,10 +2,4 @@
 name = "share"
 edition = "2024"
 license = "Apache 2.0"
-authors = ["Subsonic Labs, LLC (os@unconfirmed.com)"]
-
-[dependencies]
-codec = { git = "https://github.com/sui-potatoes/app.git", subdir = "packages/codec", rev = "main" }
-
-[environments]
-mirainet = "11235922"
+authors = ["Subsonic Labs, LLC (os@subsoniclabs.io)"]
