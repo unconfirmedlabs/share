@@ -12,11 +12,12 @@
 /// 5. Distribute the returned balance to shareholders
 module share::share;
 
-use std::type_name::with_defining_ids;
+use std::type_name::{TypeName, with_defining_ids};
 use sui::balance::Balance;
 use sui::bcs;
 use sui::coin::TreasuryCap;
 use sui::coin_registry::Currency;
+use sui::event::emit;
 
 // === Constants ===
 
@@ -38,6 +39,14 @@ const EMetadataCapNotDeleted: u64 = 1;
 const EInvalidShareType: u64 = 2;
 /// Currency does not have 6 decimals.
 const EInvalidDecimals: u64 = 3;
+
+// === Events ===
+
+public struct ShareInitializedEvent has copy, drop {
+    share_type: TypeName,
+    decimals: u8,
+    supply: u64,
+}
 
 // === Public Functions ===
 
@@ -66,6 +75,12 @@ public fun initialize<Share>(
 
     // Make the supply fixed.
     currency.make_supply_fixed(treasury_cap);
+
+    emit(ShareInitializedEvent {
+        share_type: with_defining_ids<Share>(),
+        decimals: DECIMALS,
+        supply: SUPPLY,
+    });
 
     balance
 }
