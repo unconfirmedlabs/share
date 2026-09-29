@@ -28,10 +28,9 @@ fun production_lifecycle_and_discovery() {
     let issuance = scenario.take_shared<Issuance>();
     assert!(object::id(&issuance) == expected);
     assert!(issuance.subject_id() == subject_id);
-    assert!(issuance.token_type().is_none());
     let Wallet { id, mut shares } = scenario.take_from_sender<Wallet>();
     id.delete();
-    assert!(shares.value() == share::total_supply());
+    assert!(shares.value() == share::max_supply!());
     let gift = shares.split(500);
     transfer::public_transfer(Wallet { id: object::new(scenario.ctx()), shares: gift }, @0xB);
     transfer::public_transfer(Wallet { id: object::new(scenario.ctx()), shares }, @0xA);
@@ -56,11 +55,11 @@ fun split_join_and_zero_conserve_supply() {
     assert!(fans.issuance_id() == object::id(&issuance));
     shares.join_vec(vector[artist, fans]);
     shares.join_vec(vector[]);
-    assert!(shares.join(share::zero(&issuance)) == share::total_supply());
+    assert!(shares.join(share::zero(&issuance)) == share::max_supply!());
     shares.split(0).destroy_zero();
     let all = shares.withdraw_all();
     shares.destroy_zero();
-    assert!(all.value() == share::total_supply());
+    assert!(all.value() == share::max_supply!());
     destroy(all); destroy(issuance); destroy(registry); destroy(subject);
 }
 
@@ -95,7 +94,7 @@ fun oversplit_rejected() {
     let mut registry = share::registry_for_testing(ctx);
     let mut subject = fixtures::subject(ctx);
     let (issuance, mut shares) = share::initialize_for_testing(&mut registry, subject.uid());
-    let invalid = shares.split(share::total_supply() + 1);
+    let invalid = shares.split(share::max_supply!() + 1);
     destroy(invalid); destroy(shares); destroy(issuance); destroy(registry); destroy(subject);
 }
 

@@ -1,38 +1,42 @@
 # misofm/share
 
-Fixed-supply ownership values for Sui Move, with optional coin conversion.
+Fixed-supply, subject-scoped ownership for Sui Move. Native ownership requires no
+currency, per-subject token package or tokenization dependency.
 
-## Native ownership: `share::share`
+The root package contains only `share::share`. Optional currency conversion is a
+[separate Move package in `tokenization/`](tokenization/README.md), depending on
+this package. MusicOS and eventOS can depend on the root package alone.
 
-A subject (composition, recording, event, etc.) initializes exactly one ownership
-supply under the package's canonical shared `IssuanceRegistry`:
+## Initialize ownership
 
 ```move
 let shares = share::initialize(&mut registry, subject_uid);
 ```
 
-The subject supplies its actual `&mut UID`, not an arbitrary ID. Its defining
-module must authorize that access. Initialization derives an `Issuance` under the
-registry using the subject ID, shares that issuance, and returns all
-**100,000,000,000,000 ownership units**. A derived claim permanently prevents
-repeat initialization. The registry has no production constructor other than
-package `init`, no deletion path, and no exposed mutable UID.
+A subject (composition, recording, event, etc.) supplies its actual `&mut UID`,
+not an arbitrary ID. Its defining module must authorize that access.
+Initialization derives an `Issuance` under the canonical shared
+`IssuanceRegistry` using the subject ID, shares that issuance, and returns the
+entire fixed ownership supply. A permanent derived claim prevents repeat
+initialization. The registry has no public constructor, deletion path or mutable
+UID accessor; package initialization creates its sole production instance.
 
-`Issuance` identifies the subject and its optional canonical token type. `Share`
-contains an issuance ID and a `u64` quantity, with **only `store`**: no object UID,
-no duplication and no implicit destruction. Applications store shares in their
-own objects or royalty positions. A share's ownership fraction is its units
-divided by `share::total_supply()`.
+`Issuance` records only identity and `subject_id`. `Share` contains an issuance ID
+and a `u64` quantity, with **only `store`**: no UID, duplication or implicit
+destruction. Applications hold shares inside their own wrappers or royalty
+positions. The issuance contains no token type or conversion configuration.
+
+## API
 
 | Function | Result |
 |---|---|
 | `initialize(&mut IssuanceRegistry, &mut UID)` | Full initial `Share`; creates shared issuance |
 | `derive_issuance_id(&IssuanceRegistry, subject_id)` | Predicted `ID`, not proof of existence |
 | `subject_id(&Issuance)` | Subject `ID` |
-| `token_type(&Issuance)` | `Option<TypeName>` |
 | `issuance_id(&Share)` | Ownership issuance `ID` |
 | `value(&Share)` | Units held |
-| `total_supply()` | Fixed units per issuance |
+| `max_supply!()` | Fixed maximum units per issuance: `100_000_000_000_000u64` |
+| `decimals!()` | Standard token representation precision: `6u8` |
 | `zero(&Issuance)` | Zero units for that issuance |
 | `split(&mut Share, amount)` | Removes and returns that amount |
 | `join(&mut Share, Share)` | Consumes another value; returns new total |
@@ -40,107 +44,45 @@ divided by `share::total_supply()`.
 | `withdraw_all(&mut Share)` | Returns everything, leaving zero |
 | `destroy_zero(Share)` | Consumes only a zero value |
 
+Supply and decimal parameters are public macro functions so integrations can
+reuse the ownership unit conventions without duplicating constants. The native
+ownership fraction is `value / max_supply!()`; decimals do not affect that ratio.
+
 Operations follow Sui Balance conventions. Joining checks issuance identity at
-runtime (even for zeros), rather than relying on a per-subject type parameter.
-Splitting zero or the full balance is supported. Empty vector joins are no-ops.
-Checked arithmetic and transaction atomicity protect failed operations. Ordinary
-split/join operations touch neither shared registry nor shared issuance.
+runtime, including zero values. Splitting zero or the full balance is supported.
+Empty vector joins are no-ops. Checked arithmetic and transaction atomicity
+protect failed operations. Splits and joins touch no shared objects.
 
-The registry address is discoverable from `RegistryCreated`. `Issued` records the
-subject and issuance identities. No issuance enumeration or holder registry is
-needed for the primitive.
+The registry address is discoverable from `RegistryCreated`; `Issued` records
+the subject and issuance identities. There is no holder enumeration requirement.
 
-## Optional coins: `share::tokenization`
+## Conservation and integration
 
-Create a currency externally, then authorize its one-time binding using the
-subject UID and issuance:
+Native ownership units are created only at subject initialization. There is no
+public or package-private reconstruction/mint interface, nonzero burn, issuer
+clawback, or tokenization-specific authority in this package. Every native unit,
+including units held as backing by adapters, remains part of the fixed supply.
 
-```move
-let conversion = tokenization::initialize(
-    &mut issuance,
-    subject_uid,
-    &currency,
-    treasury_cap,
-);
-tokenization::share(conversion);
-```
+The separate tokenization package holds shares and issues coin receipts against
+them. It cannot create native ownership. Other integrations can use the same
+public API without being approved by the subject or this package.
 
-`initialize` returns an unshared `Tokenization<T>`; `share` is its only production
-by-value consumer, so initialization must complete by sharing it in the same
-transaction. Its address derives from the issuance and can be computed with
-`tokenization::derive_tokenization_id(&issuance)`.
+Royalty positions hold native shares alongside reward debt and registration
+state. Payout funds continue to use `Balance<Currency>`. Existing coin-based
+royalty pools require adaptation; see [INTEGRATION.md](INTEGRATION.md).
 
-The currency must have zero outstanding supply, its canonical treasury cap,
-6 decimals, deleted metadata capability and no regulation/deny capability.
-The type must be exactly `<address>::share::Share`, without type parameters.
-This excludes legacy one-time-witness currencies whose regulation status can
-be unknown even when their issuer retains freeze authority. There is one canonical token type
-per issuance. Binding is permanent even after all tokens convert back to native
-shares. The treasury cannot be extracted or used for arbitrary minting.
-
-```move
-let balance = conversion.tokenize(shares);
-let shares = conversion.detokenize(balance);
-```
-
-`tokenize` consumes native shares and mints equal coin base units;
-`detokenize` burns the balance and reconstructs equal native units. Both are
-holder-accessible and require only the shared conversion object. A wrong issuance
-is rejected. `tokenization::issuance_id` and `tokenization::tokenized_supply` expose its binding
-and outstanding token quantity. Use Sui's existing `coin::from_balance` and
-`coin::into_balance` when object coins are needed.
-
-For each issuance:
-
-```text
-native share units + outstanding token base units = 100,000,000,000,000
-```
-
-The currency's supply itself is deliberately not fixed: its private treasury
-must mint and burn as representations change. Fixed *combined* ownership supply
-is enforced by this package. The only package-private native consumption and
-reconstruction helpers are called from these paired conversion operations.
-Every module in the package is part of that trusted boundary. Publish this
-package immutably to prevent upgrades from changing that guarantee.
-
-## Enforcement boundaries
-
-Native and tokenized ownership share one conservation rule. The native layer
-provides canonical one-time issuance, subject UID authorization, linear ownership
-values and issuance checks on joins. Tokenization preserves those properties and
-adds currency validation: the exact share type name, zero initial coin supply,
-canonical treasury, locked metadata, six decimals and no regulation.
-
-The exact type name also excludes legacy OTW currencies: their migrated registry
-state can be Unknown, for which `is_regulated()` alone is not a sufficient check.
-A regression test exercises that legacy path and verifies rejection.
-
-Unlike the original coin-only model, the treasury is retained privately for
-conversion. Native supply and outstanding coin supply are conserved together;
-there is no public mint, nonzero burn, treasury extraction or issuer clawback.
-Royalty accounting and application-level transfer rules belong in integrations,
-not in the native ownership primitive.
-
-## Royalty pool integration
-
-Native shares represent ownership, not accrued earnings. A royalty position can
-hold a `Share` plus its pool registrations and reward debt. Payment funds still
-use `Balance<Currency>` (SUI, stablecoins, etc.).
-
-The existing `misofm/royalty-pool` is **not compatible yet**: it holds
-`Balance<ShareType>`, validates share currencies and uses the share type as an
-identity boundary. See [INTEGRATION.md](INTEGRATION.md) for the integration requirements.
-
-## Validation
+## Build and test
 
 ```sh
 sui move build
-sui move test --coverage
+sui move test
 ```
 
-Tests cover canonical issuance discovery, the production shared-object lifecycle,
-duplicate initialization, native conservation, cross-issuance rejection, currency
-validation, single token binding, repeated conversion conservation, and transfer
-of coin receipts to another holder who redeems without subject authority.
+Tokenization has its own build, dependency graph and tests:
+
+```sh
+sui move build --path tokenization
+sui move test --path tokenization
+```
 
 Licensed under Apache-2.0.

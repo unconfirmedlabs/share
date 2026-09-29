@@ -16,8 +16,9 @@ recombining ownership, settle and unregister the position, or implement explicit
 operations that preserve reward accounting. Exposing mutable shares in a
 registered position could change its weight without updating the pool.
 
-Tokenization consumes native shares. Settle and unregister their positions before
-conversion, or provide a separate revenue-accounting mechanism. Holding receipt
+Tokenization takes custody of native shares as backing. Settle and unregister
+their positions before depositing them, or provide a separate revenue-accounting
+mechanism. Holding receipt
 coins alone does not track accrued earnings.
 
 ## Subject protocols

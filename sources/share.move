@@ -4,16 +4,12 @@
 /// Fixed-supply, subject-scoped ownership. No currency is needed until tokenization.
 module share::share;
 
-use std::type_name::{Self, TypeName};
 use sui::derived_object;
 use sui::event;
 
-const SUPPLY: u64 = 100_000_000_000_000;
 const ENotEnough: u64 = 0;
 const EIssuanceMismatch: u64 = 1;
 const ENonZero: u64 = 2;
-const ESubjectMismatch: u64 = 3;
-const EAlreadyTokenized: u64 = 4;
 
 /// The only production registry is created at package initialization.
 public struct IssuanceRegistry has key { id: UID }
@@ -22,7 +18,6 @@ public struct IssuanceRegistry has key { id: UID }
 public struct Issuance has key {
     id: UID,
     subject_id: ID,
-    token_type: Option<TypeName>,
 }
 
 /// Linear ownership units. Applications provide custody and revenue accounting.
@@ -54,14 +49,14 @@ public fun initialize(registry: &mut IssuanceRegistry, subject: &mut UID): Share
     shares
 }
 
+#[allow(unused_mut_parameter)]
 fun create(registry: &mut IssuanceRegistry, subject: &mut UID): (Issuance, Share) {
     let subject_id = subject.to_inner();
     let issuance = Issuance {
         id: derived_object::claim(&mut registry.id, IssuanceKey(subject_id)),
         subject_id,
-        token_type: option::none(),
     };
-    let shares = Share { issuance_id: object::id(&issuance), value: SUPPLY };
+    let shares = Share { issuance_id: object::id(&issuance), value: max_supply!() };
     (issuance, shares)
 }
 
@@ -71,10 +66,13 @@ public fun derive_issuance_id(registry: &IssuanceRegistry, subject_id: ID): ID {
 }
 
 public fun subject_id(self: &Issuance): ID { self.subject_id }
-public fun token_type(self: &Issuance): Option<TypeName> { self.token_type }
 public fun issuance_id(self: &Share): ID { self.issuance_id }
 public fun value(self: &Share): u64 { self.value }
-public fun total_supply(): u64 { SUPPLY }
+/// Fixed ownership units per issuance. Also the maximum possible token backing.
+public macro fun max_supply(): u64 { 100_000_000_000_000 }
+
+/// Standard decimal precision when representing ownership units as tokens.
+public macro fun decimals(): u8 { 6 }
 
 public fun zero(issuance: &Issuance): Share {
     Share { issuance_id: object::id(issuance), value: 0 }
@@ -106,26 +104,6 @@ public fun withdraw_all(self: &mut Share): Share {
 public fun destroy_zero(self: Share) {
     let Share { issuance_id: _, value } = self;
     assert!(value == 0, ENonZero);
-}
-
-/// Only tokenization::initialize calls this after validating the currency and treasury.
-public(package) fun bind_token<T>(self: &mut Issuance, subject: &mut UID): &mut UID {
-    assert!(self.subject_id == subject.to_inner(), ESubjectMismatch);
-    assert!(self.token_type.is_none(), EAlreadyTokenized);
-    self.token_type = option::some(type_name::with_defining_ids<T>());
-    &mut self.id
-}
-
-/// Trusted conversion boundary: every caller must mint exactly these units.
-public(package) fun into_token_units(shares: Share, expected: ID): u64 {
-    let Share { issuance_id, value } = shares;
-    assert!(issuance_id == expected, EIssuanceMismatch);
-    value
-}
-
-/// Trusted conversion boundary: every caller must first burn these units.
-public(package) fun from_token_units(issuance_id: ID, value: u64): Share {
-    Share { issuance_id, value }
 }
 
 #[test_only]

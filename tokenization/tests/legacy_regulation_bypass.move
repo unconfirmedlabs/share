@@ -1,9 +1,9 @@
 #[test_only]
-module share::legacy_regulation_bypass;
+module tokenization::legacy_regulation_bypass;
 
 use share::share;
-use share::tokenization;
-use share::fixtures;
+use tokenization::tokenization;
+use tokenization::fixtures;
 use sui::coin;
 use sui::coin_registry;
 use sui::deny_list::{Self, DenyList};
@@ -21,7 +21,7 @@ fun legacy_unknown_regulation_rejected() {
     let ctx = scenario.ctx();
     let mut registry = share::registry_for_testing(ctx);
     let mut subject = fixtures::subject(ctx);
-    let (mut issuance, mut shares) = share::initialize_for_testing(&mut registry, subject.uid());
+    let (issuance, mut shares) = share::initialize_for_testing(&mut registry, subject.uid());
     // This is the real legacy production coin constructor. In deployment the
     // witness is supplied by init; test construction merely sets up that state.
     let (treasury, mut deny, legacy) = coin::create_regulated_currency_v2(
@@ -37,9 +37,11 @@ fun legacy_unknown_regulation_rejected() {
     assert!(!currency.is_regulated()); // Unknown is reported as false.
     assert!(currency.is_metadata_cap_deleted());
 
-    let mut conversion = tokenization::initialize(&mut issuance, subject.uid(), &currency, treasury);
+    let mut tokens = tokenization::registry_for_testing(ctx);
+    let (mut conversion, initial) = tokenization::initialize(&mut tokens, shares.split(1), &currency, treasury);
+    destroy(initial);
     let receipt = coin::from_balance(conversion.tokenize(shares.split(100)), ctx);
-    assert!(conversion.tokenized_supply() == 100);
+    assert!(conversion.tokenized_supply() == 101);
 
     // The regulator remains usable despite the adapter's no-regulation check.
     let mut deny_list = scenario.take_shared<DenyList>();
@@ -52,7 +54,7 @@ fun legacy_unknown_regulation_rejected() {
     assert!(currency.is_regulated());
     tokenization::share(conversion);
     test_scenario::return_shared(deny_list);
-    destroy(registry); destroy(subject); destroy(issuance); destroy(shares);
+    destroy(tokens); destroy(registry); destroy(subject); destroy(issuance); destroy(shares);
     destroy(currency); destroy(coin_registry); destroy(legacy); destroy(deny); destroy(receipt);
     scenario.end();
 }
