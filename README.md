@@ -53,7 +53,7 @@ runtime, including zero values. Splitting zero or the full balance is supported.
 Empty vector joins are no-ops. Checked arithmetic and transaction atomicity
 protect failed operations. Splits and joins touch no shared objects.
 
-The registry address is discoverable from `RegistryCreated`; `Issued` records
+The registry address is discoverable from `IssuanceRegistryCreatedEvent`; `IssuanceCreatedEvent` records
 the subject and issuance identities. There is no holder enumeration requirement.
 
 ## Conservation and integration
