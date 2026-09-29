@@ -3,7 +3,7 @@
 
 /// Optional, reversible 1:1 conversion. Treasury access never escapes this module.
 /// Native units plus outstanding token base units always equal the fixed supply.
-module share::token;
+module share::tokenization;
 
 use share::share::{Self, Issuance, Share};
 use sui::balance::Balance;

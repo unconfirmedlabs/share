@@ -2,11 +2,6 @@
 
 Fixed-supply ownership values for Sui Move, with optional coin conversion.
 
-**This is a new, unpublished API generation.** `Published.toml` records the previous
-coin-only deployments. This source needs a fresh immutable publication; it is not
-an in-place upgrade or a migration of existing holders. `AUDIT.md` is historical
-and does not audit this implementation.
-
 ## Native ownership: `share::share`
 
 A subject (composition, recording, event, etc.) initializes exactly one ownership
@@ -55,25 +50,25 @@ The registry address is discoverable from `RegistryCreated`. `Issued` records th
 subject and issuance identities. No issuance enumeration or holder registry is
 needed for the primitive.
 
-## Optional coins: `share::token`
+## Optional coins: `share::tokenization`
 
 Create a currency externally, then authorize its one-time binding using the
 subject UID and issuance:
 
 ```move
-let conversion = token::initialize(
+let conversion = tokenization::initialize(
     &mut issuance,
     subject_uid,
     &currency,
     treasury_cap,
 );
-token::share(conversion);
+tokenization::share(conversion);
 ```
 
 `initialize` returns an unshared `Tokenization<T>`; `share` is its only production
 by-value consumer, so initialization must complete by sharing it in the same
 transaction. Its address derives from the issuance and can be computed with
-`token::derive_tokenization_id(&issuance)`.
+`tokenization::derive_tokenization_id(&issuance)`.
 
 The currency must have zero outstanding supply, its canonical treasury cap,
 6 decimals, deleted metadata capability and no regulation/deny capability.
@@ -89,7 +84,7 @@ let shares = conversion.detokenize(balance);
 `tokenize` consumes native shares and mints equal coin base units;
 `detokenize` burns the balance and reconstructs equal native units. Both are
 holder-accessible and require only the shared conversion object. A wrong issuance
-is rejected. `token::issuance_id` and `token::tokenized_supply` expose its binding
+is rejected. `tokenization::issuance_id` and `tokenization::tokenized_supply` expose its binding
 and outstanding token quantity. Use Sui's existing `coin::from_balance` and
 `coin::into_balance` when object coins are needed.
 
@@ -106,7 +101,7 @@ reconstruction helpers are called from these paired conversion operations.
 Every module in the package is part of that trusted boundary. Publish this
 package immutably to prevent upgrades from changing that guarantee.
 
-## Royalty pools and migration
+## Royalty pool integration
 
 Native shares represent ownership, not accrued earnings. A royalty position can
 hold a `Share` plus its pool registrations and reward debt. Payment funds still
@@ -114,8 +109,7 @@ use `Balance<Currency>` (SUI, stablecoins, etc.).
 
 The existing `misofm/royalty-pool` is **not compatible yet**: it holds
 `Balance<ShareType>`, validates share currencies and uses the share type as an
-identity boundary. See [MIGRATION.md](MIGRATION.md) for the required changes.
-This repository does not silently change any dependent package or deployment.
+identity boundary. See [INTEGRATION.md](INTEGRATION.md) for the integration requirements.
 
 ## Validation
 

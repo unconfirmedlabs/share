@@ -108,7 +108,7 @@ public fun destroy_zero(self: Share) {
     assert!(value == 0, ENonZero);
 }
 
-/// Only token::initialize calls this after validating the currency and treasury.
+/// Only tokenization::initialize calls this after validating the currency and treasury.
 public(package) fun bind_token<T>(self: &mut Issuance, subject: &mut UID): &mut UID {
     assert!(self.subject_id == subject.to_inner(), ESubjectMismatch);
     assert!(self.token_type.is_none(), EAlreadyTokenized);
