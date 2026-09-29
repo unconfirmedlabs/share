@@ -10,7 +10,8 @@ this package. MusicOS and eventOS can depend on the root package alone.
 ## Initialize ownership
 
 ```move
-let shares = share::initialize(&mut registry, subject_uid);
+// 100 million shares displayed with 6 decimal places.
+let shares = share::initialize(&mut registry, subject_uid, 100_000_000_000_000, 6);
 ```
 
 A subject (composition, recording, event, etc.) supplies its actual `&mut UID`,
@@ -21,7 +22,7 @@ entire fixed ownership supply. A permanent derived claim prevents repeat
 initialization. The registry has no public constructor, deletion path or mutable
 UID accessor; package initialization creates its sole production instance.
 
-`Issuance` records only identity and `subject_id`. `Share` contains an issuance ID
+`Issuance` records `subject_id`, immutable `supply`, and immutable `decimals`. `Share` contains an issuance ID
 and a `u64` quantity, with **only `store`**: no UID, duplication or implicit
 destruction. Applications hold shares inside their own wrappers or royalty
 positions. The issuance contains no token type or conversion configuration.
@@ -30,13 +31,13 @@ positions. The issuance contains no token type or conversion configuration.
 
 | Function | Result |
 |---|---|
-| `initialize(&mut IssuanceRegistry, &mut UID)` | Full initial `Share`; creates shared issuance |
+| `initialize(&mut IssuanceRegistry, &mut UID, supply: u64, decimals: u8)` | Full initial `Share`; creates shared issuance |
 | `derive_issuance_id(&IssuanceRegistry, subject_id)` | Predicted `ID`, not proof of existence |
 | `subject_id(&Issuance)` | Subject `ID` |
 | `issuance_id(&Share)` | Ownership issuance `ID` |
 | `value(&Share)` | Units held |
-| `max_supply!()` | Fixed maximum units per issuance: `100_000_000_000_000u64` |
-| `decimals!()` | Standard token representation precision: `6u8` |
+| `supply(&Issuance)` | Fixed total base units for this issuance |
+| `decimals(&Issuance)` | Display precision for this issuance |
 | `zero(&Issuance)` | Zero units for that issuance |
 | `split(&mut Share, amount)` | Removes and returns that amount |
 | `join(&mut Share, Share)` | Consumes another value; returns new total |
@@ -44,9 +45,15 @@ positions. The issuance contains no token type or conversion configuration.
 | `withdraw_all(&mut Share)` | Returns everything, leaving zero |
 | `destroy_zero(Share)` | Consumes only a zero value |
 
-Supply and decimal parameters are public macro functions so integrations can
-reuse the ownership unit conventions without duplicating constants. The native
-ownership fraction is `value / max_supply!()`; decimals do not affect that ratio.
+Supply is a positive `u64`: `1` through `18_446_744_073_709_551_615`, inclusive.
+Decimals accept the full `u8` range (`0` through `255`), matching Sui currency
+creation. These are display metadata; initialization never computes a power of
+ten or multiplies supply by a decimal scale. Supply is already in base units.
+The native ownership fraction is `value / issuance.supply()`; decimals do not
+affect that ratio. There is no package-wide supply or decimal default.
+
+The former `max_supply!()` and `decimals!()` macros are replaced by per-issuance
+getters. Callers must now supply both parameters to initialization.
 
 Operations follow Sui Balance conventions. Joining checks issuance identity at
 runtime, including zero values. Splitting zero or the full balance is supported.
@@ -54,7 +61,8 @@ Empty vector joins are no-ops. Checked arithmetic and transaction atomicity
 protect failed operations. Splits and joins touch no shared objects.
 
 The registry address is discoverable from `IssuanceRegistryCreatedEvent`; `IssuanceCreatedEvent` records
-the subject and issuance identities. There is no holder enumeration requirement.
+the subject and issuance identities plus supply (`u64`) and decimals (`u8`).
+Event decoders must account for these two additional fields. There is no holder enumeration requirement.
 
 ## Conservation and integration
 

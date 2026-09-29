@@ -14,6 +14,7 @@ use sui::event;
 const ENotEnough: u64 = 0;
 const EIssuanceMismatch: u64 = 1;
 const ENonZero: u64 = 2;
+const EEmptySupply: u64 = 3;
 
 // === Structs ===
 
@@ -24,6 +25,8 @@ public struct IssuanceRegistry has key { id: UID }
 public struct Issuance has key {
     id: UID,
     subject_id: ID,
+    supply: u64,
+    decimals: u8,
 }
 
 /// Linear ownership units. Applications provide custody and revenue accounting.
@@ -38,7 +41,12 @@ public struct IssuanceKey(ID) has copy, drop, store;
 // === Events ===
 
 public struct IssuanceRegistryCreatedEvent has copy, drop { registry_id: ID }
-public struct IssuanceCreatedEvent has copy, drop { issuance_id: ID, subject_id: ID }
+public struct IssuanceCreatedEvent has copy, drop {
+    issuance_id: ID,
+    subject_id: ID,
+    supply: u64,
+    decimals: u8,
+}
 
 // === Public Functions ===
 
@@ -50,11 +58,20 @@ fun init(ctx: &mut TxContext) {
 
 /// Subject UID access is the authorization boundary. The subject's defining
 /// module must gate that access appropriately. Derived claims cannot be reused.
-public fun initialize(registry: &mut IssuanceRegistry, subject: &mut UID): Share {
-    let (issuance, shares) = create(registry, subject);
+/// Supply is positive and measured in base units. Decimals are display metadata;
+/// the full u8 range is accepted, matching Sui currency creation.
+public fun initialize(
+    registry: &mut IssuanceRegistry,
+    subject: &mut UID,
+    supply: u64,
+    decimals: u8,
+): Share {
+    let (issuance, shares) = create(registry, subject, supply, decimals);
     event::emit(IssuanceCreatedEvent {
         issuance_id: object::id(&issuance),
         subject_id: issuance.subject_id,
+        supply: issuance.supply,
+        decimals: issuance.decimals,
     });
     transfer::share_object(issuance);
     shares
@@ -102,22 +119,30 @@ public fun derive_issuance_id(registry: &IssuanceRegistry, subject_id: ID): ID {
 public fun subject_id(self: &Issuance): ID { self.subject_id }
 public fun issuance_id(self: &Share): ID { self.issuance_id }
 public fun value(self: &Share): u64 { self.value }
-/// Fixed ownership units per issuance. Also the maximum possible token backing.
-public macro fun max_supply(): u64 { 100_000_000_000_000 }
+/// Immutable total base units, including any units held as token backing.
+public fun supply(self: &Issuance): u64 { self.supply }
 
-/// Standard decimal precision when representing ownership units as tokens.
-public macro fun decimals(): u8 { 6 }
+/// Immutable display precision, matching the corresponding receipt currency.
+public fun decimals(self: &Issuance): u8 { self.decimals }
 
 // === Private Functions ===
 
 #[allow(unused_mut_parameter)]
-fun create(registry: &mut IssuanceRegistry, subject: &mut UID): (Issuance, Share) {
+fun create(
+    registry: &mut IssuanceRegistry,
+    subject: &mut UID,
+    supply: u64,
+    decimals: u8,
+): (Issuance, Share) {
+    assert!(supply > 0, EEmptySupply);
     let subject_id = subject.to_inner();
     let issuance = Issuance {
         id: derived_object::claim(&mut registry.id, IssuanceKey(subject_id)),
         subject_id,
+        supply,
+        decimals,
     };
-    let shares = Share { issuance_id: object::id(&issuance), value: max_supply!() };
+    let shares = Share { issuance_id: object::id(&issuance), value: supply };
     (issuance, shares)
 }
 
@@ -132,7 +157,9 @@ public fun registry_for_testing(ctx: &mut TxContext): IssuanceRegistry {
 public fun initialize_for_testing(
     registry: &mut IssuanceRegistry,
     subject: &mut UID,
-): (Issuance, Share) { create(registry, subject) }
+    supply: u64,
+    decimals: u8,
+): (Issuance, Share) { create(registry, subject, supply, decimals) }
 
 #[test_only]
 public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }
@@ -141,15 +168,14 @@ public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }
 /// and accounting. Production shares come only from `initialize`.
 #[test_only]
 public fun create_for_testing(issuance: &Issuance, value: u64): Share {
-    assert!(value <= max_supply!(), ENotEnough);
+    assert!(value <= issuance.supply(), ENotEnough);
     Share { issuance_id: object::id(issuance), value }
 }
 
-/// Builds a bounded fixture when the tested package stores only the issuance
+/// Builds a fixture when the tested package stores only the issuance
 /// ID. This bypasses authentic issuance and supply conservation; tests using
 /// it do not prove either property. Use real issuance/split for integration.
 #[test_only]
 public fun create_for_testing_from_id(issuance_id: ID, value: u64): Share {
-    assert!(value <= max_supply!(), ENotEnough);
     Share { issuance_id, value }
 }

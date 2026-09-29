@@ -5,6 +5,9 @@
 A native royalty position holds `share::share::Share` alongside its registrations
 and reward debt. Payout funds continue to use `Balance<Currency>`.
 
+- Read supply and decimals from the issuance; never assume a global denomination.
+- Audit reward arithmetic for the full `u64` supply range, including supplies
+  larger than any fixed reward precision constant.
 - Bind each pool to a genuine `Issuance` and retain its ID.
 - Check a position's issuance ID before accepting its shares.
 - Include issuance identity and payout currency in the pool's derivation.
@@ -24,7 +27,7 @@ coins alone does not track accrued earnings.
 ## Subject protocols
 
 Compositions, recordings and events can initialize shares during creation using
-their own UID, then return or allocate the ownership units. They need no
+their own UID and explicit supply/decimal parameters, then return or allocate the ownership units. They need no
 per-subject share type parameter.
 
 Administrative capabilities must bind to and validate the relevant subject ID.
