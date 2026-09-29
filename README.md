@@ -4,7 +4,7 @@ Fixed-supply, subject-scoped ownership for Sui Move. Native ownership requires n
 currency, per-subject token package or tokenization dependency.
 
 The root package contains only `share::share`. Optional currency conversion is a
-[separate Move package in `tokenization/`](tokenization/README.md), depending on
+[separate `misofm/tokenization` package](https://github.com/misofm/tokenization), depending on
 this package. MusicOS and eventOS can depend on the root package alone.
 
 ## Initialize ownership
@@ -78,11 +78,7 @@ sui move build
 sui move test
 ```
 
-Tokenization has its own build, dependency graph and tests:
-
-```sh
-sui move build --path tokenization
-sui move test --path tokenization
-```
+Tokenization has its own repository, dependency graph, build and tests:
+[misofm/tokenization](https://github.com/misofm/tokenization).
 
 Licensed under Apache-2.0.
