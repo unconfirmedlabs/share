@@ -1,3 +1,5 @@
+> Historical audit of the previous coin-only implementation. It does not apply to the new native-share and tokenization API.
+
 # Security Audit — `share`
 
 **Revision:** working tree @ `d67ff8c` (`main`) · **Date:** 2026-08-22 ·
