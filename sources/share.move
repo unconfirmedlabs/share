@@ -144,3 +144,12 @@ public fun create_for_testing(issuance: &Issuance, value: u64): Share {
     assert!(value <= max_supply!(), ENotEnough);
     Share { issuance_id: object::id(issuance), value }
 }
+
+/// Builds a bounded fixture when the tested package stores only the issuance
+/// ID. This bypasses authentic issuance and supply conservation; tests using
+/// it do not prove either property. Use real issuance/split for integration.
+#[test_only]
+public fun create_for_testing_from_id(issuance_id: ID, value: u64): Share {
+    assert!(value <= max_supply!(), ENotEnough);
+    Share { issuance_id, value }
+}
