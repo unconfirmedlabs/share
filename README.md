@@ -1,10 +1,10 @@
-# misofm/share
+# unconfirmedlabs/share
 
 Fixed-supply, subject-scoped ownership for Sui Move. Native ownership requires no
 currency, per-subject token package or tokenization dependency.
 
 The root package contains only `share::share`. Optional currency conversion is a
-[separate `misofm/tokenization` package](https://github.com/misofm/tokenization), depending on
+[separate `unconfirmedlabs/tokenization` package](https://github.com/unconfirmedlabs/tokenization), depending on
 this package. MusicOS and eventOS can depend on the root package alone.
 
 ## Initialize ownership
@@ -79,6 +79,6 @@ sui move test
 ```
 
 Tokenization has its own repository, dependency graph, build and tests:
-[misofm/tokenization](https://github.com/misofm/tokenization).
+[unconfirmedlabs/tokenization](https://github.com/unconfirmedlabs/tokenization).
 
 Licensed under Apache-2.0.
