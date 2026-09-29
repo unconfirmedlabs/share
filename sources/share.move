@@ -136,3 +136,11 @@ public fun initialize_for_testing(
 
 #[test_only]
 public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }
+
+/// Builds a bounded share fixture for tests that focus on downstream custody
+/// and accounting. Production shares come only from `initialize`.
+#[test_only]
+public fun create_for_testing(issuance: &Issuance, value: u64): Share {
+    assert!(value <= max_supply!(), ENotEnough);
+    Share { issuance_id: object::id(issuance), value }
+}
