@@ -11,6 +11,7 @@ use sui::coin::{Self, TreasuryCap};
 use sui::coin_registry::Currency;
 use sui::event;
 use sui::derived_object;
+use std::type_name::with_defining_ids;
 
 public struct TokenizationKey() has copy, drop, store;
 
@@ -19,7 +20,9 @@ const EMetadataNotLocked: u64 = 1;
 const EInvalidDecimals: u64 = 2;
 const ERegulatedCurrency: u64 = 3;
 const ETreasuryMismatch: u64 = 4;
+const EInvalidShareType: u64 = 5;
 const DECIMALS: u8 = 6;
+const SHARE_TYPE: vector<u8> = b"::share::Share";
 
 public struct Tokenization<phantom T> has key {
     id: UID,
@@ -33,8 +36,9 @@ public struct TokenizationCreated<phantom T> has copy, drop {
     currency_id: ID,
 }
 
-/// The subject authorizes its one canonical token type. T need not use a
-/// particular module/type name. Currency creation is external to this package.
+/// The subject authorizes its one canonical token type: <address>::share::Share.
+/// This exact non-OTW name excludes legacy currencies with Unknown regulation.
+/// Currency creation is external to this package.
 /// The treasury stays live for conversion, unlike a fixed-supply Coin currency.
 public fun initialize<T>(
     issuance: &mut Issuance,
@@ -42,6 +46,7 @@ public fun initialize<T>(
     currency: &Currency<T>,
     treasury: TreasuryCap<T>,
 ): Tokenization<T> {
+    assert!(has_share_type_name<T>(), EInvalidShareType);
     assert!(currency.treasury_cap_id() == option::some(object::id(&treasury)), ETreasuryMismatch);
     assert!(coin::total_supply(&treasury) == 0, ENotZeroSupply);
     assert!(currency.is_metadata_cap_deleted(), EMetadataNotLocked);
@@ -81,3 +86,23 @@ public fun detokenize<T>(self: &mut Tokenization<T>, balance: Balance<T>): Share
     let amount = self.treasury.supply_mut().decrease_supply(balance);
     share::from_token_units(self.issuance_id, amount)
 }
+
+/// Preserve the original share currency gate. Legacy constructors require an
+/// uppercase OTW name; `share::Share` cannot be one, so Unknown regulation from
+/// legacy migration cannot enter this path. Generic instantiations also fail.
+fun has_share_type_name<T>(): bool {
+    let name = with_defining_ids<T>();
+    let bytes = name.as_string().as_bytes();
+    let suffix = SHARE_TYPE;
+    if (bytes.length() < suffix.length()) return false;
+    let offset = bytes.length() - suffix.length();
+    let mut i = 0;
+    while (i < suffix.length()) {
+        if (bytes[offset + i] != suffix[i]) return false;
+        i = i + 1;
+    };
+    true
+}
+
+#[test_only]
+public fun has_share_type_name_for_testing<T>(): bool { has_share_type_name<T>() }

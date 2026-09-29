@@ -5,7 +5,8 @@ module share::tokenization_tests;
 
 use share::share::{Self, Issuance, IssuanceRegistry, Share};
 use share::tokenization::{Self, Tokenization};
-use share::fixtures::{Self, Receipt, Subject};
+use share::fixtures::{Self, Subject, Share as WrongModuleShare};
+use receipt_fixture::share::Share as Receipt;
 use sui::coin;
 use sui::test_scenario;
 use std::type_name;
@@ -185,7 +186,7 @@ fun foreign_subject_rejected() {
 }
 
 #[test, expected_failure(abort_code = 4, location = share)]
-fun second_token_type_rejected() {
+fun repeated_token_binding_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = share::registry_for_testing(ctx);
     let mut subject = fixtures::subject(ctx);
@@ -193,7 +194,8 @@ fun second_token_type_rejected() {
     let (mut currency, treasury, metadata) = fixtures::currency(6, ctx);
     currency.delete_metadata_cap(metadata);
     let first = tokenization::initialize(&mut issuance, subject.uid(), &currency, treasury);
-    let (other_currency, other_treasury) = fixtures::other_currency(ctx);
+    let (mut other_currency, other_treasury, other_metadata) = fixtures::currency(6, ctx);
+    other_currency.delete_metadata_cap(other_metadata);
     let second = tokenization::initialize(&mut issuance, subject.uid(), &other_currency, other_treasury);
     destroy(first); destroy(second); destroy(currency); destroy(other_currency);
     destroy(issuance); destroy(shares); destroy(registry); destroy(subject);
@@ -214,4 +216,25 @@ fun foreign_issuance_cannot_tokenize() {
     destroy(invalid); destroy(conversion); destroy(currency);
     destroy(foreign); destroy(foreign_issuance);
     destroy(issuance); destroy(shares); destroy(registry); destroy(subject);
+}
+
+#[test, expected_failure(abort_code = 5, location = tokenization)]
+fun wrong_token_name_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = share::registry_for_testing(ctx);
+    let mut subject = fixtures::subject(ctx);
+    let (mut issuance, shares) = share::initialize_for_testing(&mut registry, subject.uid());
+    let (currency, treasury) = fixtures::other_currency(ctx);
+    let invalid = tokenization::initialize(&mut issuance, subject.uid(), &currency, treasury);
+    destroy(invalid); destroy(currency); destroy(issuance); destroy(shares);
+    destroy(registry); destroy(subject);
+}
+
+#[test]
+fun exact_type_name_gate() {
+    assert!(tokenization::has_share_type_name_for_testing<Receipt>());
+    assert!(!tokenization::has_share_type_name_for_testing<u64>());
+    assert!(!tokenization::has_share_type_name_for_testing<vector<Receipt>>());
+    assert!(!tokenization::has_share_type_name_for_testing<receipt_fixture::share::OtherShare>());
+    assert!(!tokenization::has_share_type_name_for_testing<WrongModuleShare>());
 }

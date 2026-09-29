@@ -72,7 +72,9 @@ transaction. Its address derives from the issuance and can be computed with
 
 The currency must have zero outstanding supply, its canonical treasury cap,
 6 decimals, deleted metadata capability and no regulation/deny capability.
-There is **no required name for the type T**. There is one canonical token type
+The type must be exactly `<address>::share::Share`, without type parameters.
+This excludes legacy one-time-witness currencies whose regulation status can
+be unknown even when their issuer retains freeze authority. There is one canonical token type
 per issuance. Binding is permanent even after all tokens convert back to native
 shares. The treasury cannot be extracted or used for arbitrary minting.
 
@@ -100,6 +102,24 @@ is enforced by this package. The only package-private native consumption and
 reconstruction helpers are called from these paired conversion operations.
 Every module in the package is part of that trusted boundary. Publish this
 package immutably to prevent upgrades from changing that guarantee.
+
+## Enforcement boundaries
+
+Native and tokenized ownership share one conservation rule. The native layer
+provides canonical one-time issuance, subject UID authorization, linear ownership
+values and issuance checks on joins. Tokenization preserves those properties and
+adds currency validation: the exact share type name, zero initial coin supply,
+canonical treasury, locked metadata, six decimals and no regulation.
+
+The exact type name also excludes legacy OTW currencies: their migrated registry
+state can be Unknown, for which `is_regulated()` alone is not a sufficient check.
+A regression test exercises that legacy path and verifies rejection.
+
+Unlike the original coin-only model, the treasury is retained privately for
+conversion. Native supply and outstanding coin supply are conserved together;
+there is no public mint, nonzero burn, treasury extraction or issuer clawback.
+Royalty accounting and application-level transfer rules belong in integrations,
+not in the native ownership primitive.
 
 ## Royalty pool integration
 
