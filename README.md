@@ -1,39 +1,54 @@
 # unconfirmedlabs/share
 
-Fixed-supply, subject-scoped ownership for Sui Move. Native ownership requires no
-currency, per-subject token package or tokenization dependency.
+Fixed-supply ownership scoped to a parent object, for Sui Move. Native ownership
+requires no currency, per-issuance token package, tokenization dependency or
+global registry.
 
 The root package contains only `share::share`. Optional currency conversion is a
 [separate `unconfirmedlabs/tokenization` package](https://github.com/unconfirmedlabs/tokenization), depending on
 this package. MusicOS and eventOS can depend on the root package alone.
 
-## Initialize ownership
+## Create an issuance
 
 ```move
 // 100 million shares displayed with 6 decimal places.
-let shares = share::initialize(&mut registry, subject_uid, 100_000_000_000_000, 6);
+let (issuance, shares) = share::new(&mut scheme.id, 100_000_000_000_000, 6);
+// Create pools or register stakes here, then:
+issuance.share();
 ```
 
-A subject (composition, recording, event, etc.) supplies its actual `&mut UID`,
-not an arbitrary ID. Its defining module must authorize that access.
-Initialization derives an `Issuance` under the canonical shared
-`IssuanceRegistry` using the subject ID, shares that issuance, and returns the
-entire fixed ownership supply. A permanent derived claim prevents repeat
-initialization. The registry has no public constructor, deletion path or mutable
-UID accessor; package initialization creates its sole production instance.
+The parent is the object that gives the shares their meaning, usually a
+scheme or license object owned by the integrating protocol. The caller supplies
+its actual `&mut UID`, and the parent's defining module must authorize that
+access. The `Issuance` is a derived object of the parent under `IssuanceKey()`,
+so each parent has at most one issuance, and the permanent derived claim
+prevents repeat creation. There is no global registry and no shared object on
+the creation path.
 
-`Issuance` records `subject_id`, immutable `supply`, and immutable `decimals`. `Share` contains an issuance ID
-and a `u64` quantity, with **only `store`**: no UID, duplication or implicit
-destruction. Applications hold shares inside their own wrappers or royalty
-positions. The issuance contains no token type or conversion configuration.
+`new` returns the issuance unshared, so the caller can use it (for example to
+create a royalty pool) before sharing it. `Issuance` has only `key`, so the
+creating transaction must call `share`.
+
+`Issuance` records `parent_id` (so clients can go from a share back to its
+parent without an indexer), immutable `supply` and immutable `decimals`.
+`Share` contains an issuance ID and a `u64` quantity, with **only `store`**: no
+UID, duplication or implicit destruction. Applications hold shares inside their
+own wrappers or royalty positions. The issuance contains no token type or
+conversion configuration.
+
+Prefer a dedicated scheme object as the parent over a widely used object such
+as a musicos `Composition` or `Recording`. A parent has one issuance slot, so
+using a shared identity object as the parent would give its first user that
+slot permanently.
 
 ## API
 
 | Function | Result |
 |---|---|
-| `initialize(&mut IssuanceRegistry, &mut UID, supply: u64, decimals: u8)` | Full initial `Share`; creates shared issuance |
-| `derive_issuance_id(&IssuanceRegistry, subject_id)` | Predicted `ID`, not proof of existence |
-| `subject_id(&Issuance)` | Subject `ID` |
+| `new(&mut UID, supply: u64, decimals: u8)` | Unshared `Issuance` and the full initial `Share` |
+| `share(Issuance)` | Shares the issuance; required in the creating transaction |
+| `derive_address(parent_id)` | Predicted issuance address, not proof of existence |
+| `parent_id(&Issuance)` | Parent `ID` |
 | `issuance_id(&Share)` | Ownership issuance `ID` |
 | `value(&Share)` | Units held |
 | `supply(&Issuance)` | Fixed total base units for this issuance |
@@ -52,28 +67,24 @@ ten or multiplies supply by a decimal scale. Supply is already in base units.
 The native ownership fraction is `value / issuance.supply()`; decimals do not
 affect that ratio. There is no package-wide supply or decimal default.
 
-The former `max_supply!()` and `decimals!()` macros are replaced by per-issuance
-getters. Callers must now supply both parameters to initialization.
-
 Operations follow Sui Balance conventions. Joining checks issuance identity at
 runtime, including zero values. Splitting zero or the full balance is supported.
 Empty vector joins are no-ops. Checked arithmetic and transaction atomicity
 protect failed operations. Splits and joins touch no shared objects.
 
-The registry address is discoverable from `IssuanceRegistryCreatedEvent`; `IssuanceCreatedEvent` records
-the subject and issuance identities plus supply (`u64`) and decimals (`u8`).
-Event decoders must account for these two additional fields. There is no holder enumeration requirement.
+`IssuanceCreatedEvent` records the issuance and parent identities plus supply
+(`u64`) and decimals (`u8`). There is no holder enumeration requirement.
 
 ## Conservation and integration
 
-Native ownership units are created only at subject initialization. There is no
+Native ownership units are created only by `new`. There is no
 public or package-private reconstruction/mint interface, nonzero burn, issuer
 clawback, or tokenization-specific authority in this package. Every native unit,
 including units held as backing by adapters, remains part of the fixed supply.
 
 The separate tokenization package holds shares and issues coin receipts against
 them. It cannot create native ownership. Other integrations can use the same
-public API without being approved by the subject or this package.
+public API without being approved by the parent or this package.
 
 Royalty positions hold native shares alongside reward debt and registration
 state. Payout funds continue to use `Balance<Currency>`. Existing coin-based

@@ -24,18 +24,28 @@ their positions before depositing them, or provide a separate revenue-accounting
 mechanism. Holding receipt
 coins alone does not track accrued earnings.
 
-## Subject protocols
+## Parent protocols
 
-Compositions, recordings and events can initialize shares during creation using
-their own UID and explicit supply/decimal parameters, then return or allocate the ownership units. They need no
-per-subject share type parameter.
+A protocol creates shares with `share::new` on a parent object it controls,
+usually a scheme or license object dedicated to what the shares mean. Pass
+explicit supply and decimals, then allocate the returned units. No per-issuance
+share type parameter is needed.
 
-Administrative capabilities must bind to and validate the relevant subject ID.
-Shares for different subjects have the same Move type, so authorization and pool
-membership checks must explicitly compare identities.
+`new` returns the `Issuance` unshared. Create any pools and register any stakes
+that must exist before revenue can arrive, then call `share` in the same
+transaction.
+
+Verify that an issuance belongs to a parent by derivation:
+`share::derive_address(parent_id) == object::id_address(issuance)`.
+`parent_id(&Issuance)` is for clients navigating upward, and matches the
+derivation.
+
+Administrative capabilities must bind to and validate the relevant parent ID.
+Shares for different issuances have the same Move type, so authorization and
+pool membership checks must explicitly compare identities.
 
 Native shares cannot use the framework's `Balance<T>` funds accumulator. To give
-a composition ownership in a recording, use an appropriate owned wrapper and
-receiving path, or a protected container on the composition. Do not expose raw
-mutable UID access merely to route ownership. Routed positions must verify the
-issuance and preserve their intended payout destination.
+one party ownership in another's shares, use an appropriate owned wrapper and
+receiving path, or a protected container. Do not expose raw mutable UID access
+merely to route ownership. Routed positions must verify the issuance and
+preserve their intended payout destination.

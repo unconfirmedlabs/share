@@ -1,7 +1,7 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Fixed-supply, subject-scoped ownership. No currency is needed until tokenization.
+/// Fixed-supply ownership scoped to a parent object. No currency is needed until tokenization.
 module share::share;
 
 // === Imports ===
@@ -18,13 +18,12 @@ const EEmptySupply: u64 = 3;
 
 // === Structs ===
 
-/// The only production registry is created at package initialization.
-public struct IssuanceRegistry has key { id: UID }
-
-/// Permanent ownership identity. Neither deletion nor mutable UID access is exposed.
+/// Permanent ownership identity, derived from its parent. Neither deletion nor
+/// mutable UID access is exposed.
 public struct Issuance has key {
     id: UID,
-    subject_id: ID,
+    /// The parent this issuance is derived from, for navigating back up.
+    parent_id: ID,
     supply: u64,
     decimals: u8,
 }
@@ -35,46 +34,47 @@ public struct Share has store {
     value: u64,
 }
 
-/// Derivation key scoped to the subject ID.
-public struct IssuanceKey(ID) has copy, drop, store;
+/// Derivation key: one issuance per parent.
+public struct IssuanceKey() has copy, drop, store;
 
 // === Events ===
 
-public struct IssuanceRegistryCreatedEvent has copy, drop { registry_id: ID }
 public struct IssuanceCreatedEvent has copy, drop {
     issuance_id: ID,
-    subject_id: ID,
+    parent_id: ID,
     supply: u64,
     decimals: u8,
 }
 
 // === Public Functions ===
 
-fun init(ctx: &mut TxContext) {
-    let registry = IssuanceRegistry { id: object::new(ctx) };
-    event::emit(IssuanceRegistryCreatedEvent { registry_id: object::id(&registry) });
-    transfer::share_object(registry);
+/// Creates the parent's issuance and its full supply. Parent UID access is the
+/// authorization boundary; the parent's defining module must gate it. The
+/// derived claim is permanent, so a parent has at most one issuance. Supply is
+/// positive and in base units; decimals are display metadata.
+///
+/// The issuance is returned unshared so the caller can create pools or
+/// register stakes first. It is key-only, so the same transaction must `share` it.
+public fun new(parent: &mut UID, supply: u64, decimals: u8): (Issuance, Share) {
+    assert!(supply > 0, EEmptySupply);
+    let issuance = Issuance {
+        id: derived_object::claim(parent, IssuanceKey()),
+        parent_id: parent.to_inner(),
+        supply,
+        decimals,
+    };
+    let issuance_id = object::id(&issuance);
+    event::emit(IssuanceCreatedEvent {
+        issuance_id,
+        parent_id: issuance.parent_id,
+        supply,
+        decimals,
+    });
+    (issuance, Share { issuance_id, value: supply })
 }
 
-/// Subject UID access is the authorization boundary. The subject's defining
-/// module must gate that access appropriately. Derived claims cannot be reused.
-/// Supply is positive and measured in base units. Decimals are display metadata;
-/// the full u8 range is accepted, matching Sui currency creation.
-public fun initialize(
-    registry: &mut IssuanceRegistry,
-    subject: &mut UID,
-    supply: u64,
-    decimals: u8,
-): Share {
-    let (issuance, shares) = create(registry, subject, supply, decimals);
-    event::emit(IssuanceCreatedEvent {
-        issuance_id: object::id(&issuance),
-        subject_id: issuance.subject_id,
-        supply: issuance.supply,
-        decimals: issuance.decimals,
-    });
-    transfer::share_object(issuance);
-    shares
+public fun share(self: Issuance) {
+    transfer::share_object(self);
 }
 
 public fun zero(issuance: &Issuance): Share {
@@ -111,12 +111,13 @@ public fun destroy_zero(self: Share) {
 
 // === View Functions ===
 
-/// Computes an address, not evidence that initialization has occurred.
-public fun derive_issuance_id(registry: &IssuanceRegistry, subject_id: ID): ID {
-    derived_object::derive_address(registry.id.to_inner(), IssuanceKey(subject_id)).to_id()
+/// The issuance address for a parent. Computes an address, not evidence that
+/// the issuance exists.
+public fun derive_address(parent_id: ID): address {
+    derived_object::derive_address(parent_id, IssuanceKey())
 }
 
-public fun subject_id(self: &Issuance): ID { self.subject_id }
+public fun parent_id(self: &Issuance): ID { self.parent_id }
 public fun issuance_id(self: &Share): ID { self.issuance_id }
 public fun value(self: &Share): u64 { self.value }
 /// Immutable total base units, including any units held as token backing.
@@ -125,47 +126,10 @@ public fun supply(self: &Issuance): u64 { self.supply }
 /// Immutable display precision, matching the corresponding receipt currency.
 public fun decimals(self: &Issuance): u8 { self.decimals }
 
-// === Private Functions ===
-
-#[allow(unused_mut_parameter)]
-fun create(
-    registry: &mut IssuanceRegistry,
-    subject: &mut UID,
-    supply: u64,
-    decimals: u8,
-): (Issuance, Share) {
-    assert!(supply > 0, EEmptySupply);
-    let subject_id = subject.to_inner();
-    let issuance = Issuance {
-        id: derived_object::claim(&mut registry.id, IssuanceKey(subject_id)),
-        subject_id,
-        supply,
-        decimals,
-    };
-    let shares = Share { issuance_id: object::id(&issuance), value: supply };
-    (issuance, shares)
-}
-
 // === Test Functions ===
 
-#[test_only]
-public fun registry_for_testing(ctx: &mut TxContext): IssuanceRegistry {
-    IssuanceRegistry { id: object::new(ctx) }
-}
-
-#[test_only]
-public fun initialize_for_testing(
-    registry: &mut IssuanceRegistry,
-    subject: &mut UID,
-    supply: u64,
-    decimals: u8,
-): (Issuance, Share) { create(registry, subject, supply, decimals) }
-
-#[test_only]
-public fun init_for_testing(ctx: &mut TxContext) { init(ctx) }
-
 /// Builds a bounded share fixture for tests that focus on downstream custody
-/// and accounting. Production shares come only from `initialize`.
+/// and accounting. Production shares come only from `new`.
 #[test_only]
 public fun create_for_testing(issuance: &Issuance, value: u64): Share {
     assert!(value <= issuance.supply(), ENotEnough);
