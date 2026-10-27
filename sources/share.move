@@ -54,7 +54,6 @@ public fun mint<Share: key>(
         ETreasuryMismatch,
     );
     assert!(treasury_cap.total_supply() == 0, ENotZeroSupply);
-
     let shares = treasury_cap.mint_balance(supply);
     currency.make_supply_fixed(treasury_cap);
     shares
