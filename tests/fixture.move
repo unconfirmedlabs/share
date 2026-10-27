@@ -9,7 +9,6 @@ use sui::coin::{TreasuryCap, DenyCapV2};
 use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
 
 public struct Fixture has key { id: UID }
-
 public struct Generic<phantom Inner> has key { id: UID }
 
 public fun registry(ctx: &mut TxContext): CoinRegistry {
