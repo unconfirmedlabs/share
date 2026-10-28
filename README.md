@@ -1,4 +1,4 @@
-# misofm/share
+# share
 
 Canonical fixed-supply share coins for Sui Move.
 

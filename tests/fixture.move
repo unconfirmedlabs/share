@@ -1,12 +1,14 @@
-// Copyright (c) Miso Labs, Inc.
+// Copyright (c) Unconfirmed Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
 module share::fixture;
 
 use std::string::String;
-use sui::coin::{TreasuryCap, DenyCapV2};
-use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
+use sui::{
+    coin::{TreasuryCap, DenyCapV2},
+    coin_registry::{Self, Currency, CoinRegistry, MetadataCap}
+};
 
 public struct Fixture has key { id: UID }
 public struct Generic<phantom Inner> has key { id: UID }

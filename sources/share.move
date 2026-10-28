@@ -1,16 +1,10 @@
-// Copyright (c) Miso Labs, Inc.
+// Copyright (c) Unconfirmed Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 module share::share;
 
-// === Imports ===
-
-use std::ascii;
-use std::string::String;
-use std::type_name;
-use sui::balance::Balance;
-use sui::coin::TreasuryCap;
-use sui::coin_registry::Currency;
+use std::{ascii, string::String, type_name};
+use sui::{balance::Balance, coin::TreasuryCap, coin_registry::Currency};
 
 // === Errors ===
 

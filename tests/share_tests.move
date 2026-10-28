@@ -1,17 +1,12 @@
-// Copyright (c) Miso Labs, Inc.
+// Copyright (c) Unconfirmed Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
 module share::share_tests;
 
-use std::string::String;
-use std::unit_test::{assert_eq, destroy};
-use sui::balance::Balance;
-use sui::coin::TreasuryCap;
-use sui::coin_registry::{CoinRegistry, Currency};
-use share::fixture::{Self, Fixture, Generic};
-use share::other_fixture;
-use share::share;
+use share::{fixture::{Self, Fixture, Generic}, other_fixture, share};
+use std::{string::String, unit_test::{assert_eq, destroy}};
+use sui::{balance::Balance, coin::TreasuryCap, coin_registry::{CoinRegistry, Currency}};
 
 const SUPPLY: u64 = 100_000_000_000_000;
 const ICON_URL: vector<u8> = b"https://example.com/i.png";
