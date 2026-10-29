@@ -19,6 +19,7 @@ const EInvalidIconUrl: u64 = 7;
 const ETreasuryMismatch: u64 = 8;
 const ENotZeroSupply: u64 = 9;
 const EZeroSupply: u64 = 10;
+const ESupplyAlreadySet: u64 = 11;
 
 // === Public Functions ===
 
@@ -43,6 +44,7 @@ public fun mint<Share: key>(
     assert!(currency.symbol() == symbol, EInvalidSymbol);
     assert!(currency.description() == description, EInvalidDescription);
     assert!(currency.icon_url() == icon_url, EInvalidIconUrl);
+    assert!(currency.total_supply().is_none(), ESupplyAlreadySet);
     assert!(
         currency.treasury_cap_id() == option::some(object::id(&treasury_cap)),
         ETreasuryMismatch,

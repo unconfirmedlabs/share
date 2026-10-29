@@ -37,6 +37,7 @@ let shares: Balance<Share> = share::mint(
 | The metadata cap is deleted | `EMetadataNotLocked` |
 | The currency is unregulated | `ERegulatedCurrency` |
 | Decimals, name, symbol, description and icon URL equal the expected values | `EInvalidDecimals` … `EInvalidIconUrl` |
+| The currency's supply is not yet fixed or burn-only | `ESupplyAlreadySet` |
 | The treasury cap is the one recorded on the currency | `ETreasuryMismatch` |
 | Nothing is minted | `ENotZeroSupply` |
 
@@ -68,7 +69,8 @@ module and once per type; one-time witnesses have only `drop`. The
 `ETreasuryMismatch` check is defense in depth: for `Share: key` only one
 `TreasuryCap<Share>` can exist (`coin::new_treasury_cap` is package-only and the
 legacy constructors need `Share: drop`), so it guards against future framework
-changes.
+changes. `ESupplyAlreadySet` is defense in depth for the same reason: a fixed
+or burn-only supply has consumed the only treasury cap.
 
 ## Build and test
 
